@@ -1,35 +1,47 @@
-# Example of simple echo server
-# www.solusipse.net
-
 import socket
+import thread
 
-def listen():
-    connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    connection.bind(('10.148.0.2', 5010))
-    connection.listen(10)
-    while True:
-        current_connection, address = connection.accept()
-        while True:
-            data = current_connection.recv(2048)
+#empty host string. bind() will use the current machine address
+host = '127.0.0.1'
+port = 50000
+backlog = 5
+size = 1024
 
-            if data == 'quit\r\n':
-                current_connection.shutdown(1)
-                current_connection.close()
-                break
+def replytoClient(clientSocket, address):
+    while 1:
+        receivedData = clientSocket.recv(size)
+        
+        if not receivedData: break
+        
+        print "data = ", receivedData
+        clientSocket.send(receivedData)
+    
+    clientSocket.close()
+    print "disconnected from ", address
 
-            elif data == 'stop\r\n':
-                current_connection.shutdown(1)
-                current_connection.close()
-                exit()
+#create a socket
+serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-            elif data:
-                current_connection.send(data)
-                print data
+#restart server quickly when it terminates. also to reuse the same port
+serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
+#bind the socket to a port
+serverSocket.bind((host, port))
 
-if __name__ == "__main__":
-    try:
-        listen()
-    except KeyboardInterrupt:
-        pass
+#listen for connections
+serverSocket.listen(backlog)
+
+print "server running on ", serverSocket.getsockname()
+print "waiting for connections"
+
+try:
+    while 1:
+        clientSocket, address = serverSocket.accept()
+        print "connected from ", address
+        
+        try:
+            thread.start_new_thread( replytoClient, (clientSocket, address,))
+        except:
+            print "Error: unable to start thread"
+finally:
+    serverSocket.close()
